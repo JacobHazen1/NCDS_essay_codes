@@ -1,0 +1,21 @@
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(tidyr)
+library(readr)
+library(stringr)
+library(haven)
+
+
+df_age42 <- read_dta("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age42_Sweep6/stata/stata13_se/ncds6_v2.dta")
+# Example: Create a dataframe with variable names and their labels
+var_labels <- sapply(df_age42, function(x) attr(x, "label"))
+label_df <- data.frame(variable = names(var_labels), label = unname(var_labels), stringsAsFactors = FALSE)
+
+```
+
+```{r}
+
+keep_admin_vars_age42 <- c("ncdsid" = "ncdsid", "n622_6" = "chsex", "n6region" = "region", "seearn" = "earnbftax", "hsize" = "hhsize")
+```
+
