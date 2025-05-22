@@ -1,0 +1,22 @@
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(tidyr)
+library(readr)
+library(stringr)
+library(haven)
+
+
+df_age23 <- read_dta("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age23_Sweep4/stata/stata13/ncds4.dta")
+df_age42 <- read_dta("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age42_Sweep6/stata/stata13_se/ncds6_v2.dta")
+# Example: Create a dataframe with variable names and their labels
+var_labels <- sapply(df_age42, function(x) attr(x, "label"))
+label_df <- data.frame(variable = names(var_labels), label = unname(var_labels), stringsAsFactors = FALSE)
+
+```
+
+```{r}
+keep_admin_vars_age23 <- c("ncdsid" = "ncdsid", "n622_4" = "chsex", "n4region" = "region", "n4143" = "everemployed", "n4239" = "curjobwrkstatus", "n4260" = "curjobinc", "n4331" = "curjobhrwrk", "n4529" = "highqual", "n4656" = "numolvl", "n4658" = "numalvl")
+keep_admin_vars_age42 <- c("ncdsid" = "ncdsid", "n622_6" = "chsex", "n6region" = "region", "seearn" = "earnbftax", "n4239" = "curjobwrkstatus", "n4260" = "curjobinc", "n4331" = "curjobhrwrk", "n4529" = "highqual", "n4656" = "numolvl", "n4658" = "numalvl")
+```
+

@@ -1,0 +1,155 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        
+            <script src="lib/bindings/utils.js"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css" integrity="sha512-WgxfT5LWjfszlPHXRmBWHkV2eceiWTOBvrKCNbdgDYTHrT2AeLCGbF4sZlZw3UMN3WtL0tGUoIAKsu8mllg/XA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js" integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            
+        
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6"
+          crossorigin="anonymous"
+        />
+        <script
+          src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
+          crossorigin="anonymous"
+        ></script>
+
+
+        <center>
+          <h1></h1>
+        </center>
+        <style type="text/css">
+
+             #mynetwork {
+                 width: 2600px;
+                 height: 2000px;
+                 background-color: #ffffff;
+                 border: 1px solid lightgray;
+                 position: relative;
+                 float: left;
+             }
+
+             
+
+             
+
+             
+        </style>
+    </head>
+
+
+    <body>
+        <div class="card" style="width: 100%">
+            
+            
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+
+        
+        
+
+        <script type="text/javascript">
+
+              // initialize global variables.
+              var edges;
+              var nodes;
+              var allNodes;
+              var allEdges;
+              var nodeColors;
+              var originalNodes;
+              var network;
+              var container;
+              var options, data;
+              var filter = {
+                  item : '',
+                  property : '',
+                  value : []
+              };
+
+              
+
+              
+
+              // This method is responsible for drawing the graph, returns the drawn network
+              function drawGraph() {
+                  var container = document.getElementById('mynetwork');
+
+                  
+
+                  // parsing and collecting nodes and edges from the python
+                  nodes = new vis.DataSet([{"color": "#97c2fc", "id": "i", "label": "i", "shape": "dot", "value": 65}, {"color": "#97c2fc", "id": "the child", "label": "the child", "shape": "dot", "value": 4}, {"color": "#97c2fc", "id": "a car", "label": "a car", "shape": "dot", "value": 4}, {"color": "#97c2fc", "id": "a girl", "label": "a girl", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "a job", "label": "a job", "shape": "dot", "value": 3}, {"color": "#97c2fc", "id": "my friend", "label": "my friend", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "a happy life", "label": "a happy life", "shape": "dot", "value": 2}, {"color": "#97c2fc", "id": "football", "label": "football", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "a dog", "label": "a dog", "shape": "dot", "value": 2}, {"color": "#97c2fc", "id": "a house", "label": "a house", "shape": "dot", "value": 5}, {"color": "#97c2fc", "id": "time", "label": "time", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "my husband", "label": "my husband", "shape": "dot", "value": 4}, {"color": "#97c2fc", "id": "three bedroom", "label": "three bedroom", "shape": "dot", "value": 3}, {"color": "#97c2fc", "id": "dinner", "label": "dinner", "shape": "dot", "value": 2}, {"color": "#97c2fc", "id": "which", "label": "which", "shape": "dot", "value": 3}, {"color": "#97c2fc", "id": "college", "label": "college", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "one", "label": "one", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "we", "label": "we", "shape": "dot", "value": 10}, {"color": "#97c2fc", "id": "tea", "label": "tea", "shape": "dot", "value": 2}, {"color": "#97c2fc", "id": "hundred", "label": "hundred", "shape": "dot", "value": 3}, {"color": "#97c2fc", "id": "the day", "label": "the day", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "my job", "label": "my job", "shape": "dot", "value": 2}, {"color": "#97c2fc", "id": "the garden", "label": "the garden", "shape": "dot", "value": 2}, {"color": "#97c2fc", "id": "money", "label": "money", "shape": "dot", "value": 2}, {"color": "#97c2fc", "id": "the cow", "label": "the cow", "shape": "dot", "value": 2}, {"color": "#97c2fc", "id": "a lot", "label": "a lot", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "pound", "label": "pound", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "book", "label": "book", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "tv", "label": "tv", "shape": "dot", "value": 2}, {"color": "#97c2fc", "id": "flower", "label": "flower", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "the housework", "label": "the housework", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "a garage", "label": "a garage", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "cake", "label": "cake", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "art", "label": "art", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "bird", "label": "bird", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "my interest", "label": "my interest", "shape": "dot", "value": 1}, {"color": "#97c2fc", "id": "blue eye", "label": "blue eye", "shape": "dot", "value": 1}]);
+                  edges = new vis.DataSet([{"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "the child", "value": 2110}, {"arrows": "to", "from": "i", "hidden": false, "label": "take", "to": "the child", "value": 244}, {"arrows": "to", "from": "i", "hidden": false, "label": "like", "to": "the child", "value": 186}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "a car", "value": 901}, {"arrows": "to", "from": "i", "hidden": false, "label": "get", "to": "a car", "value": 214}, {"arrows": "to", "from": "i", "hidden": false, "label": "buy", "to": "a car", "value": 186}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "a girl", "value": 813}, {"arrows": "to", "from": "i", "hidden": false, "label": "get", "to": "a job", "value": 813}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "a job", "value": 746}, {"arrows": "to", "from": "i", "hidden": false, "label": "do", "to": "a job", "value": 170}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "my friend", "value": 766}, {"arrows": "to", "from": "i", "hidden": false, "label": "lead", "to": "a happy life", "value": 763}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "a happy life", "value": 171}, {"arrows": "to", "from": "i", "hidden": false, "label": "play", "to": "football", "value": 674}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "a dog", "value": 654}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "a house", "value": 622}, {"arrows": "to", "from": "i", "hidden": false, "label": "buy", "to": "a house", "value": 175}, {"arrows": "to", "from": "i", "hidden": false, "label": "get", "to": "a house", "value": 171}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "time", "value": 614}, {"arrows": "to", "from": "i", "hidden": false, "label": "do", "to": "i", "value": 560}, {"arrows": "to", "from": "i", "hidden": false, "label": "like", "to": "i", "value": 540}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "i", "value": 314}, {"arrows": "to", "from": "i", "hidden": false, "label": "enjoy", "to": "i", "value": 277}, {"arrows": "to", "from": "i", "hidden": false, "label": "take", "to": "i", "value": 239}, {"arrows": "to", "from": "i", "hidden": false, "label": "take", "to": "my husband", "value": 548}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "my husband", "value": 330}, {"arrows": "to", "from": "i", "hidden": false, "label": "help", "to": "my husband", "value": 237}, {"arrows": "to", "from": "i", "hidden": false, "label": "visit", "to": "my husband", "value": 234}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "three bedroom", "value": 537}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "dinner", "value": 534}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "which", "value": 481}, {"arrows": "to", "from": "i", "hidden": false, "label": "get", "to": "which", "value": 190}, {"arrows": "to", "from": "i", "hidden": false, "label": "do", "to": "which", "value": 183}, {"arrows": "to", "from": "i", "hidden": false, "label": "leave", "to": "college", "value": 473}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "one", "value": 404}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "tea", "value": 378}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "hundred", "value": 377}, {"arrows": "to", "from": "i", "hidden": false, "label": "get", "to": "hundred", "value": 220}, {"arrows": "to", "from": "i", "hidden": false, "label": "do", "to": "hundred", "value": 212}, {"arrows": "to", "from": "i", "hidden": false, "label": "take", "to": "we", "value": 356}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "the day", "value": 352}, {"arrows": "to", "from": "i", "hidden": false, "label": "enjoy", "to": "my job", "value": 349}, {"arrows": "to", "from": "i", "hidden": false, "label": "like", "to": "my job", "value": 259}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "the garden", "value": 333}, {"arrows": "to", "from": "i", "hidden": false, "label": "get", "to": "money", "value": 318}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "money", "value": 262}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "the cow", "value": 315}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "a lot", "value": 303}, {"arrows": "to", "from": "i", "hidden": false, "label": "get", "to": "pound", "value": 259}, {"arrows": "to", "from": "i", "hidden": false, "label": "read", "to": "book", "value": 240}, {"arrows": "to", "from": "i", "hidden": false, "label": "watch", "to": "tv", "value": 228}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "tv", "value": 170}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "flower", "value": 217}, {"arrows": "to", "from": "i", "hidden": false, "label": "do", "to": "the housework", "value": 196}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "a garage", "value": 179}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "cake", "value": 176}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "art", "value": 174}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "bird", "value": 170}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "my interest", "value": 164}, {"arrows": "to", "from": "i", "hidden": false, "label": "have", "to": "blue eye", "value": 164}, {"arrows": "to", "from": "a house", "hidden": false, "label": "have", "to": "three bedroom", "value": 233}, {"arrows": "to", "from": "we", "hidden": false, "label": "have", "to": "dinner", "value": 394}, {"arrows": "to", "from": "we", "hidden": false, "label": "have", "to": "the child", "value": 304}, {"arrows": "to", "from": "we", "hidden": false, "label": "have", "to": "a car", "value": 255}, {"arrows": "to", "from": "we", "hidden": false, "label": "have", "to": "a dog", "value": 228}, {"arrows": "to", "from": "we", "hidden": false, "label": "have", "to": "tea", "value": 225}, {"arrows": "to", "from": "we", "hidden": false, "label": "have", "to": "three bedroom", "value": 205}, {"arrows": "to", "from": "we", "hidden": false, "label": "have", "to": "a house", "value": 188}, {"arrows": "to", "from": "we", "hidden": false, "label": "have", "to": "the garden", "value": 181}, {"arrows": "to", "from": "we", "hidden": false, "label": "have", "to": "the cow", "value": 163}]);
+
+                  nodeColors = {};
+                  allNodes = nodes.get({ returnType: "Object" });
+                  for (nodeId in allNodes) {
+                    nodeColors[nodeId] = allNodes[nodeId].color;
+                  }
+                  allEdges = edges.get({ returnType: "Object" });
+                  // adding nodes and edges to the graph
+                  data = {nodes: nodes, edges: edges};
+
+                  var options = {
+    "configure": {
+        "enabled": false
+    },
+    "edges": {
+        "color": {
+            "inherit": true
+        },
+        "smooth": {
+            "enabled": true,
+            "type": "dynamic"
+        }
+    },
+    "interaction": {
+        "dragNodes": true,
+        "hideEdgesOnDrag": false,
+        "hideNodesOnDrag": false
+    },
+    "physics": {
+        "enabled": true,
+        "stabilization": {
+            "enabled": true,
+            "fit": true,
+            "iterations": 1000,
+            "onlyDynamicEdges": false,
+            "updateInterval": 50
+        }
+    }
+};
+
+                  
+
+
+                  
+
+                  network = new vis.Network(container, data, options);
+
+                  
+
+                  
+
+                  
+
+
+                  
+
+                  return network;
+
+              }
+              drawGraph();
+        </script>
+    </body>
+</html>

@@ -1,7 +1,9 @@
 import ollama
 import pandas as pd
 
-path = "/Users/xuefeicheng/Desktop/essay/NCDS_essay_codes/"
+# path = "/Users/xuefeicheng/Desktop/essay/NCDS_essay_codes/"
+
+path = "/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/"
 df_essay = pd.read_csv(path + 'Data/essay11/raw_all_essays.csv')
 
 df_sample = df_essay.sample(1)
