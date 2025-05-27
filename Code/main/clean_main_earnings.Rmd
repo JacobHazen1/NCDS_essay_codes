@@ -1,0 +1,148 @@
+```{r}
+library(dplyr)
+library(tidyr)
+library(readr)
+library(stringr)
+library(haven)
+library(lavaan)
+
+df_age23 <- read_stata("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age23_Sweep4/stata/stata13/ncds4.dta")
+# df_age33 <- read_stata("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age33_Sweep5/stata/stata13_se/ncds5cmi.dta")
+# df_age42 <- read_stata("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age42_Sweep6/stata/stata13_se/ncds6_v2.dta")
+var_labels <- sapply(df_age23, function(x) attr(x, "label"))
+label_df <- data.frame(variable = names(var_labels), label = unname(var_labels), stringsAsFactors = FALSE)
+```
+
+# Focus on Earnings First at Age 23, note earnings were recorded in pence not pounds
+```{r}
+df_age23_selected <- df_age23 %>% select(ncdsid, n4269ph,n4371ph, n4331, n4421, n4237) %>% rename(curEarnHr = n4269ph, lastEarnHr = n4371ph, curJobHr = n4331, lastJobHr = n4421, isWrk= n4237)
+df_age23_selected <- df_age23_selected %>%
+  mutate(across(-ncdsid, ~na_if(., -1)))
+df_age23_selected <- df_age23_selected %>%
+  mutate(isWrk = case_when(
+    isWrk == 1 ~ 1,
+    isWrk == 2 ~ 0,
+    TRUE ~ NA_real_
+  ))
+
+summary(df_age23_selected)
+
+
+```
+```{r}
+
+## 1. Start from the cleaned extract you already built
+df <- df_age23_selected   # shorthand
+
+## 2. Compute weekly earnings for current and last job
+df <- df %>% 
+  mutate(
+    curEarnWk  = if_else(!is.na(curEarnHr)  & !is.na(curJobHr),
+                         curEarnHr  * curJobHr, NA_real_),
+    lastEarnWk = if_else(!is.na(lastEarnHr) & !is.na(lastJobHr),
+                         lastEarnHr * lastJobHr, NA_real_)
+  )
+
+## 3. Pick the “best” observed wage (no fallback to last job earnings)
+df <- df %>% 
+  mutate(
+    earnWk_obs23 = case_when(
+      isWrk == 1 & !is.na(curEarnWk) ~ curEarnWk,
+      TRUE                           ~ NA_real_
+    ),
+    wage_from_last = 0L  # no fallback used
+  )
+
+## 4. Classify why a wage is missing
+df <- df %>% 
+  mutate(
+    miss_attrit23 = if_else(isWrk == 1  & is.na(earnWk_obs23), 1L, 0L, missing = NULL),
+    workless23    = if_else(isWrk == 0, 1L, 0L, missing = NULL)
+  )
+
+## 5. Attrition-case imputation (placeholder)
+df <- df %>% 
+  mutate(
+    earnWk_impAttrit23 = NA_real_,                     # to be filled later
+    wage_impAttrit23   = if_else(miss_attrit23 == 1, 1L, 0L)
+  )
+
+## 6. Workless-case imputations
+avg_benefit_week_1981 <- 650  # <- plug in your CPI-adjusted figure
+df <- df %>% 
+  mutate(
+    earnWk_zero23      = if_else(workless23 == 1, 0, NA_real_),
+    earnWk_repl23      = if_else(workless23 == 1, avg_benefit_week_1981, NA_real_),
+    wage_impWorkless23 = if_else(workless23 == 1, 1L, 0L)
+  )
+
+## 7. Assemble final series
+df <- df %>% 
+  mutate(
+    earnWk23_var1 = coalesce(earnWk_obs23, earnWk_impAttrit23, earnWk_zero23),
+    earnWk23_var2 = coalesce(earnWk_obs23, earnWk_impAttrit23, earnWk_repl23)
+  )
+
+wk_cols <- c("curEarnWk","lastEarnWk",
+             "earnWk_obs23","earnWk_zero23","earnWk_repl23",
+             "earnWk_impAttrit23","earnWk23_var1","earnWk23_var2")
+
+df <- df %>% mutate(across(all_of(wk_cols), ~ . / 100))
+summary(df$earnWk23_var1)          # now in £
+sd(df$earnWk23_var1, na.rm = TRUE)
+
+
+```
+
+# Age 33 Earnings Data
+```{r}
+df_age33 <- read_stata("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age33_Sweep5/stata/stata13_se/ncds5cmi.dta")
+var_labels <- sapply(df_age33, function(x) attr(x, "label"))
+label_df <- data.frame(variable = names(var_labels), label = unname(var_labels), stringsAsFactors = FALSE)
+```
+
+```{r}
+# Mapping for renamed columns
+keep <- c(
+  "ncdsid" = "ncdsid",
+  "hqual23" = "educ23",
+  "hqual33" = "educ33",
+  "n500543" = "tmpJobPay",       # PAY variable
+  "n500549" = "tmpJobPayPer",    # PAY PERIOD variable
+  "n500550" = "tmpJobHr",        # Usual hours/week
+  "n540014" = "soc",             # SOC occupational code
+  "n500520" = "mainEconAct"      # Main economic activity
+)
+
+# Select and rename
+df_age33_selected <- df_age33 %>%
+  select(all_of(names(keep))) %>%
+  rename_with(~keep[.x], .cols = everything())
+
+# Set -1 to NA
+df_age33_selected <- df_age33_selected %>%
+  mutate(across(-ncdsid, ~na_if(., -1)))
+
+# Apply specific NA conditions
+df_age33_selected$tmpJobHr[df_age33_selected$tmpJobHr == 98] <- NA
+df_age33_selected$tmpJobPay[df_age33_selected$tmpJobPay >= 999996] <- NA
+df_age33_selected$tmpJobPayPer[df_age33_selected$tmpJobPayPer == 6] <- NA  # "Other" category
+
+# Normalize pay to weekly
+df_age33_selected$weekly_pay <- with(df_age33_selected, case_when(
+  tmpJobPayPer == 1 ~ tmpJobPay,          # Weekly
+  tmpJobPayPer == 2 ~ tmpJobPay / 2,      # Fortnightly
+  tmpJobPayPer == 3 ~ tmpJobPay / 4,      # Four weeks
+  tmpJobPayPer == 4 ~ tmpJobPay / 4.33,   # Calendar month
+  tmpJobPayPer == 5 ~ tmpJobPay / 52,     # Year
+  TRUE ~ NA_real_
+))
+
+# Summary stats
+summary(df_age33_selected$weekly_pay)
+sd(df_age33_selected$weekly_pay, na.rm = TRUE)
+
+```
+
+
+
