@@ -141,8 +141,23 @@ df_age33_selected$weekly_pay <- with(df_age33_selected, case_when(
 # Summary stats
 summary(df_age33_selected$weekly_pay)
 sd(df_age33_selected$weekly_pay, na.rm = TRUE)
-
+# pounds pence
 ```
 
 
+# Age 42
+cgropay
+cgroprd
+chours1
+econact
+soc
+
+```{r}
+
+df_age42 <- read_stata("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age42_Sweep6/stata/stata13_se/ncds6_v2.dta")
+```
+
+```{r}
+table(df_age42$cjsehrs,  useNA = "always")
+```
 
