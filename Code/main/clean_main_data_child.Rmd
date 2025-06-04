@@ -1,3 +1,4 @@
+
 ```{r}
 # Load necessary libraries
 library(dplyr)
@@ -5,17 +6,131 @@ library(tidyr)
 library(readr)
 library(stringr)
 library(haven)
+library(lavaan)
 
 
-df_age23 <- read_dta("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age23_Sweep4/stata/stata13/ncds4.dta")
+
+df <- read_dta("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age0to16_Sweep0to3/stata/stata13/ncds0123.dta")
+# df_age23 <- read_dta("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age23_Sweep4/stata/stata13/ncds4.dta")
+# keep_admin_vars_age23 <- c("ncdsid" = "ncdsid", "n622_4" = "chsex", "n4region" = "region", "n4143" = "everemployed", "n4239" = "curjobwrkstatus", "n4260" = "curjobinc", "n4331" = "curjobhrwrk", "n4529" = "highqual", "n4656" = "numolvl", "n4658" = "numalvl", "famnet" = "hhincweeknet")
 # Example: Create a dataframe with variable names and their labels
-var_labels <- sapply(df_age23, function(x) attr(x, "label"))
+var_labels <- sapply(df, function(x) attr(x, "label"))
 label_df <- data.frame(variable = names(var_labels), label = unname(var_labels), stringsAsFactors = FALSE)
+
+```
+# NOtess
+1_dadsch -1 values could be NA or leaving school before min age
+Income are in bands, could make it conitnous using the method of bolt
+```{r}
+keep_admin_vars <- c(
+  # Admin   
+  "ncdsid" = "ncdsid", 
+  "n622" = "T0_chsex", 
+  "n0region" = "T0_nregion", 
+  "n1region" = "T1_region", 
+  "n2region" = "T2_region", 
+  "n3region" = "T3_region", 
+  "n419" = "T1_hhsize", 
+  "n2360" = "T3_hhsize",
+  # Parents Variables
+  "n195" = "T1_dadsch", 
+  "n537" = "T0_momsch", 
+  "n2462" = "T3_dadearnwek", 
+  "n2463" = "T3_momearnwek", 
+  "n2464" = "T3_othearnwek", 
+  "n2465" = "T3_dadearnmth", 
+  "n2466" = "T3_momearnmth", 
+  "n2467" = "T3_othearnmth",
+  # Cognition
+  "n90" = "T1_mathtest", 
+  "n457" = "T1_copytest", 
+  "n1840" = "T1_drawtest", 
+  "n92" = "T1_readingtest",
+  "n914" = "T2_abVerbtest", 
+  "n917" = "T2_abNonverbtest", 
+  "n920" = "T2_abTotaltest", 
+  "n929" = "T2_copytest", 
+  "n926" = "T2_mathtest", 
+  "n923" = "T2_readingtest",
+  "n2928" = "T3_readtest", 
+  "n2930" = "T3_mathtest",
+)
 
 ```
 
 ```{r}
-keep_admin_vars_age23 <- c("ncdsid" = "ncdsid", "n622_4" = "chsex", "n4region" = "region", "n4143" = "everemployed", "n4239" = "curjobwrkstatus", "n4260" = "curjobinc", "n4331" = "curjobhrwrk", "n4529" = "highqual", "n4656" = "numolvl", "n4658" = "numalvl")
+df_selected <- df %>%
+  select(all_of(names(keep_admin_vars))) %>%
+  rename_with(~keep_admin_vars[.x], .cols = everything())
+
+```
+
+```{r}
+df_essay <- read.csv("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/essay11/Processed/essays_with_mfscores.csv")
+df_essay <- df_essay %>% rename(ncdsid = ID) %>% select(ncdsid, corrected, AUTHORITY.SUBVERSION, CARE.HARM, FAIRNESS.CHEATING, LOYALTY.BETRAYAL, PURITY.DEGRADATION)
+merged_df <- merge(df_selected, df_essay, by = "ncdsid", all.x = TRUE)
+
+```
+
+```{r}
+df_age42 <- read_dta("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age42_Sweep6/stata/stata13_se/ncds6_v2.dta")
+keep_admin_vars_age42 <- c("ncdsid" = "ncdsid", "n622_6" = "chsex", "n6region" = "region", "seearn" = "earnbftax", "hsize" = "hhsize")
+df_selected_age42 <- df_age42 %>%
+  select(all_of(names(keep_admin_vars_age42))) %>%
+  rename_with(~keep_admin_vars_age42[.x], .cols = everything())
+
+merged_df <- merge(merged_df, df_selected_age42, by = "ncdsid", all.x = TRUE)
+
+```
+
+```{r}
+vars_to_standardize <- c(
+  "T2_abTotaltest", "T2_copytest", "T2_mathtest", "T2_readingtest",
+  "AUTHORITY.SUBVERSION", "CARE.HARM", "FAIRNESS.CHEATING", 
+  "LOYALTY.BETRAYAL", "PURITY.DEGRADATION"
+)
+
+merged_df[vars_to_standardize] <- scale(merged_df[vars_to_standardize])
+
+```
+
+```{r}
+# lav_mod <- "
+# F_cogage11 =~ T2_abTotaltest + T2_copytest + T2_mathtest + T2_readingtest
+# 
+# F_cogage11 ~ AUTHORITY.SUBVERSION + CARE.HARM + FAIRNESS.CHEATING + LOYALTY.BETRAYAL + PURITY.DEGRADATION
+# "
+lav_mod <- "
+F_cogage11 =~ T2_abTotaltest + T2_copytest + T2_mathtest + T2_readingtest
+
+#AUTHORITY.SUBVERSION + CARE.HARM + FAIRNESS.CHEATING + LOYALTY.BETRAYAL + PURITY.DEGRADATION ~ slope*1 + F_cogage11
+
+earnbftax ~ AUTHORITY.SUBVERSION + CARE.HARM + FAIRNESS.CHEATING + LOYALTY.BETRAYAL + PURITY.DEGRADATION  + F_cogage11
+"
+
+fit <- sem(lav_mod, data = merged_df, meanstructure=T)
+```
+
+```{r}
+summary(fit,standardized = TRUE, fit.measures = TRUE, rsquare = TRUE)
+lavInspect(fit, "est")
+```
+
+```{r}
+model <- lm(earnbftax ~ AUTHORITY.SUBVERSION + CARE.HARM + FAIRNESS.CHEATING + 
+              LOYALTY.BETRAYAL + PURITY.DEGRADATION + T2_abTotaltest + T2_copytest + T2_mathtest + T2_readingtest + T3_dadearnwek + T3_momearnwek +  T1_dadsch + T0_momsch + T3_hhsize + T0_chsex, data = merged_df)
+summary(model)
+
+```
+```{r}
+# Check missingness for each variable in your model
+vars <- c("earnbftax", "AUTHORITY.SUBVERSION", "CARE.HARM", "FAIRNESS.CHEATING",
+          "LOYALTY.BETRAYAL", "PURITY.DEGRADATION", "T2_abTotaltest", "T2_copytest",
+          "T2_mathtest", "T2_readingtest", "T3_dadearnwek", "T3_momearnwek",
+          "T1_dadsch", "T0_momsch", "T3_hhsize", "T0_chsex")
+
+# Count non-missing for each variable
+sapply(merged_df[vars], function(x) sum(!is.na(x)))
 
 ```
 
