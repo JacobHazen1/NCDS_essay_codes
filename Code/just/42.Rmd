@@ -1,0 +1,123 @@
+library(dplyr)
+library(tidyr)
+library(readr)
+library(stringr)
+library(haven)
+
+df_age42 <- read_dta("/Users/xuefeicheng/Library/CloudStorage/OneDrive-SharedLibraries-McGillUniversity/Jacob Hazen - Data/Age42_Sweep6/stata/stata13_se/ncds6_v2.dta")
+df_age33 <- read_dta("/Users/xuefeicheng/Library/CloudStorage/OneDrive-SharedLibraries-McGillUniversity/Jacob Hazen - Data/Age33_Sweep5/stata/stata13_se/ncds5cmi.dta")
+
+df_age42$empstat <- as.character(as_factor(df_age42$empstat))
+
+df_age42_clean <- df_age42 %>%
+  select(
+    ncdsid,                         
+    sex = n622_6,
+    region = n6region,
+    hh_size = hsize,
+    tmpJobPay = cgropay,
+    tmpJobPayPer = cgroprd,
+    earnings_last_year = seearn,
+    mainEconAct = econact,
+    soc = soc,
+  )
+
+df42 <- df_age42_clean %>%
+  mutate(
+    isWrk = case_when(
+      mainEconAct %in% c(1, 2, 3, 4) ~ 1L,
+      mainEconAct %in% c(5:12) ~ 0L,
+      TRUE ~ NA_integer_
+    )
+  )
+
+df42 <- df42 %>%
+  mutate(
+    earnWk_obs42 = case_when(
+      !is.na(tmpJobPay) & !is.na(tmpJobPayPer) ~ case_when(
+        tmpJobPayPer == 1 ~ tmpJobPay,
+        tmpJobPayPer == 2 ~ tmpJobPay / 2,
+        tmpJobPayPer == 3 ~ tmpJobPay / 4,
+        tmpJobPayPer == 4 ~ tmpJobPay / 4.33,
+        tmpJobPayPer == 5 ~ tmpJobPay / 52,
+        TRUE ~ NA_real_
+      ),
+      is.na(tmpJobPay) | is.na(tmpJobPayPer) ~ if_else(!is.na(earnings_last_year), earnings_last_year / 52, NA_real_),
+      TRUE ~ NA_real_
+    )
+  )
+
+df42 <- df42 %>%
+  mutate(
+    miss_attrit42 = if_else(isWrk == 1 & is.na(earnWk_obs42), 1L, 0L, missing = NULL),
+    workless42    = if_else(isWrk == 0, 1L, 0L, missing = NULL)
+  )
+
+df42 <- df42 %>%
+  mutate(
+    earnWk_impAttrit42 = NA_real_,
+    wage_impAttrit42   = if_else(miss_attrit42 == 1, 1L, 0L)
+  )
+
+avg_benefit_week_2000s <- 650
+df42 <- df42 %>%
+  mutate(
+    earnWk_zero42      = if_else(workless42 == 1, 0, NA_real_),
+    earnWk_repl42      = if_else(workless42 == 1, avg_benefit_week_2000s, NA_real_),
+    wage_impWorkless42 = if_else(workless42 == 1, 1L, 0L)
+  )
+
+df42 <- df42 %>%
+  mutate(
+    earnWk42_var1 = coalesce(earnWk_obs42, earnWk_impAttrit42, earnWk_zero42),
+    earnWk42_var2 = coalesce(earnWk_obs42, earnWk_impAttrit42, earnWk_repl42)
+  )
+
+wk_vars42 <- c(
+  "earnWk_obs42", "earnWk_impAttrit42",
+  "earnWk_zero42", "earnWk_repl42",
+  "earnWk42_var1", "earnWk42_var2"
+)
+df42 <- df42 %>% mutate(across(all_of(wk_vars42), ~ . / 100))
+
+df_essay <- read.csv("/Users/xuefeicheng/Library/CloudStorage/OneDrive-SharedLibraries-McGillUniversity/Jacob Hazen - Data/essay11/Processed/essays_corrected.csv")
+
+df_merged <- df_essay %>%
+  left_join(df42, by = c("ID" = "ncdsid")) %>%
+  arrange(ID)
+
+df_merged <- df_merged %>%
+  mutate(across(
+    where(is.numeric),
+    ~ ifelse(. > 9999990, NA, .)
+  ))
+
+df_merged <- df_merged %>%
+  mutate(
+    hrs_worked_combined = coalesce(chours1, cjsehrs)
+  )
+
+df_educ <- df_age33 %>%
+  select(
+    ID = ncdsid,
+    educ23 = hqual23,
+    educ33 = hqual33
+  ) %>%
+  mutate(across(c(educ23, educ33), ~na_if(., -1)))
+
+df_merged <- df_merged %>%
+  left_join(df_educ, by = "ID")
+
+df_export <- df42 %>%
+  select(
+    ncdsid,                         
+    sex,
+    region,
+    hh_size,
+    earnWk42_var1,
+    earnWk42_var2,
+    mainEconAct,
+    soc,
+  )
+
+write.csv(df_export, "/Users/xuefeicheng/Desktop/cleaned_data_age42.csv", row.names = FALSE)
