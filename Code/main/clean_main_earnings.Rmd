@@ -159,5 +159,6 @@ df_age42 <- read_stata("/home/semipro321/OneDrive/School/McGill/Research Project
 
 ```{r}
 table(df_age42$cjsehrs,  useNA = "always")
+table(f_age42$tmpJobPayPer, useNA = "always")
 ```
 

@@ -1,0 +1,55 @@
+```{r}
+library(dplyr)
+library(tidyr)
+library(readr)
+library(stringr)
+library(haven)
+library(lavaan)
+library(labelled)
+df_essay <- read.csv("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/essay11/Processed/essays_with_mfscores.csv")
+df_essay <- df_essay %>% rename(ncdsid = ID) %>% select(ncdsid, corrected, AUTHORITY.SUBVERSION, CARE.HARM, FAIRNESS.CHEATING, LOYALTY.BETRAYAL, PURITY.DEGRADATION)
+
+df_lifetime <- read.csv("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/lifetime_earnings.csv")
+
+df_merge <- merge(df_lifetime, df_essay, by = "ncdsid", all.x = TRUE)
+
+df_merge <- na.omit(df_merge)
+```
+
+
+```{r}
+df <- read_dta("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age0to16_Sweep0to3/stata/stata13/ncds0123.dta")
+keep_admin_vars <- c( # Admin 
+"ncdsid" = "ncdsid", "n622" = "T0_chsex", "n0region" = "T0_nregion", "n1region" = "T1_region", "n2region" = "T2_region", "n3region" = "T3_region", "n419" = "T1_hhsize", "n2360" = "T3_hhsize", 
+# Parents Variables
+"n195" = "T1_dadsch", "n537" = "T0_momsch", "n2462" = "T3_dadearnwek", "n2463" = "T3_momearnwek", "n2464" = "T3_othearnwek", "n2465" = "T3_dadearnmth", "n2466" = "T3_momearnmth", "n2467" = "T3_othearnmth", 
+# Cognition 
+"n90" = "T1_mathtest", "n457" = "T1_copytest", "n1840" = "T1_drawtest", "n92" = "T1_readingtest", "n914" = "T2_abVerbtest", "n917" = "T2_abNonverbtest", "n920" = "T2_abTotaltest", "n929" = "T2_copytest", "n926" = "T2_mathtest", "n923" = "T2_readingtest", "n2928" = "T3_readtest", "n2930" = "T3_mathtest")
+df_selected <- df %>%
+  select(all_of(names(keep_admin_vars))) %>%
+  rename_with(~keep_admin_vars[.x], .cols = everything())
+
+df_selected <- df_selected %>%
+  mutate(across(-ncdsid, ~ifelse(. <= -1, NA, .)))
+
+df_merge <- merge(df_merge, df_selected, by = "ncdsid", all.x = TRUE)
+
+```
+
+```{r}
+df_merge <- df_merge %>% mutate(log_income = log(lifetime_earn))
+vars_to_standardize <- c(
+  "T2_abTotaltest", "T2_copytest", "T2_mathtest", "T2_readingtest",
+  "AUTHORITY.SUBVERSION", "CARE.HARM", "FAIRNESS.CHEATING", 
+  "LOYALTY.BETRAYAL", "PURITY.DEGRADATION"
+)
+df_merge$T0_chsex <- ifelse(df_merge$T0_chsex == 2, 0, 1)
+
+df_merge[vars_to_standardize] <- scale(df_merge[vars_to_standardize])
+reg_form <- "log_income ~ AUTHORITY.SUBVERSION + CARE.HARM + FAIRNESS.CHEATING + LOYALTY.BETRAYAL + PURITY.DEGRADATION + T2_mathtest"
+model <- lm(reg_form, data = df_merge)
+nobs(model)
+summary(model)
+
+```
+

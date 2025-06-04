@@ -55,7 +55,7 @@ keep_admin_vars <- c(
   "n2928" = "T3_readtest", 
   "n2930" = "T3_mathtest",
 )
-T3_dadearnwek + T3_momearnwek +  T1_dadsch + T0_momsch + T3_hhsize + T0_chsex
+
 ```
 
 ```{r}

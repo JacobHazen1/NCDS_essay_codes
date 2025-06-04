@@ -1,0 +1,401 @@
+```{r}
+library(dplyr)
+library(tidyr)
+library(readr)
+library(stringr)
+library(haven)
+library(lavaan)
+library(labelled)
+
+
+df_age23 <- read_stata("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age23_Sweep4/stata/stata13/ncds4.dta")
+# df_age33 <- read_stata("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age33_Sweep5/stata/stata13_se/ncds5cmi.dta")
+# df_age42 <- read_stata("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age42_Sweep6/stata/stata13_se/ncds6_v2.dta")
+var_labels <- sapply(df_age23, function(x) attr(x, "label"))
+label_df <- data.frame(variable = names(var_labels), label = unname(var_labels), stringsAsFactors = FALSE)
+```
+
+# Focus on Earnings First at Age 23, note earnings were recorded in pence not pounds
+```{r}
+keep <- c(
+  "ncdsid" = "ncdsid",
+  "n4269" = "tmpJobPay",       # PAY variable
+  "n4274" = "tmpJobPayPer",    # PAY PERIOD variable
+  "n4331" = "tmpJobHr",        # Usual hours/week
+  "n4529" = "qualobt",          # Highest qualification
+  "econstrg" = "econstrg"      # Economic status
+)
+# Select and rename
+df_age23_selected <- df_age23 %>%
+  select(all_of(names(keep))) %>%
+  rename_with(~keep[.x], .cols = everything())
+
+# Set -1 to NA
+df_age23_selected <- df_age23_selected %>%
+  mutate(across(-ncdsid, ~na_if(., -1)))
+
+df_age23_selected$working_status <- case_when(
+  df_age23_selected$econstrg == 2                  ~ 1,
+  df_age23_selected$econstrg %in% c(1, 3, 4)       ~ 0,
+  df_age23_selected$econstrg == 0                 ~ NA_real_,
+  TRUE                             ~ NA_real_  # catch any unexpected values
+)
+
+
+# Step 3: Normalize to weekly pay
+df_age23_selected$weekly_pay <- with(df_age23_selected, case_when(
+  tmpJobPayPer == 1 ~ tmpJobPay * 7,        # Per day → weekly
+  tmpJobPayPer == 2 ~ tmpJobPay,            # Per week
+  tmpJobPayPer == 3 ~ tmpJobPay / 2,        # Per two weeks
+  tmpJobPayPer == 4 ~ tmpJobPay / 4.33,     # Per month → approx. 4.33 weeks
+  tmpJobPayPer == 5 ~ tmpJobPay / 13,       # Per 3 months → 13 weeks
+  tmpJobPayPer == 6 ~ tmpJobPay / 26,       # Per 6 months → 26 weeks
+  tmpJobPayPer == 7 ~ tmpJobPay / 52,       # Per year
+  TRUE ~ NA_real_
+))
+
+```
+
+```{r}
+#Educ Mapping:
+
+# --- collapse n4529 into the 0–5 scale used by hqual33 ---------
+# (replace `df` with your data-frame name)
+
+df_age23_selected <- df_age23_selected %>% 
+  # treat obvious non-response codes as NA (add any others you spot)
+  mutate(qualobt = na_if(qualobt, -1),
+         qualobt = na_if(qualobt, 99)) %>%      # 99 often = “not asked”
+  
+  # map detailed codes → six broad NVQ-style bands
+  mutate(
+    educ23v1 = case_when(
+      qualobt %in% 88                     ~ 0,   # none
+      qualobt %in% c(3, 11)               ~ 1,   # CSE / RSA Stage 1  → NVQ 1
+      qualobt %in% c(4, 5, 7, 12, 14)     ~ 2,   # O-level, SCE O, RSA 2, C&G Operative → NVQ 2
+      qualobt %in% c(6, 8, 9, 13, 15, 19) ~ 3,   # A-level, SCE H, RSA 3, C&G Craft → NVQ 3
+      qualobt %in% c(16, 17, 20:27, 30)   ~ 4,   # Higher-tech certs/dips, HNC/HND, postgrad dip → NVQ 4
+      qualobt %in% c(29, 31)              ~ 5,   # First & higher degrees → NVQ 5/6
+      TRUE                              ~ NA_real_                  # anything else → NA
+  ))
+
+summary(df_age23_selected$weekly_pay)
+```
+
+
+# Age 33 Earnings Data
+```{r}
+df_age33 <- read_stata("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age33_Sweep5/stata/stata13_se/ncds5cmi.dta")
+var_labels <- sapply(df_age33, function(x) attr(x, "label"))
+label_df <- data.frame(variable = names(var_labels), label = unname(var_labels), stringsAsFactors = FALSE)
+```
+
+```{r}
+# Mapping for renamed columns
+keep <- c(
+  "ncdsid" = "ncdsid",
+  "hqual23" = "educ23",
+  "hqual33" = "educ33",
+  "n500543" = "tmpJobPay",       # PAY variable
+  "n500549" = "tmpJobPayPer",    # PAY PERIOD variable
+  "n500550" = "tmpJobHr",        # Usual hours/week
+  "n540014" = "soc",             # SOC occupational code
+  "n500520" = "empStatus"      # Main economic activity
+)
+
+# Select and rename
+df_age33_selected <- df_age33 %>%
+  select(all_of(names(keep))) %>%
+  rename_with(~keep[.x], .cols = everything())
+
+# Set -1 to NA
+df_age33_selected <- df_age33_selected %>%
+  mutate(across(-ncdsid, ~na_if(., -1)))
+
+# Apply specific NA conditions
+df_age33_selected$tmpJobHr[df_age33_selected$tmpJobHr == 98] <- NA
+df_age33_selected$tmpJobPay[df_age33_selected$tmpJobPay >= 999996] <- NA
+df_age33_selected$tmpJobPayPer[df_age33_selected$tmpJobPayPer == 6] <- NA  # "Other" category
+
+# Normalize pay to weekly
+df_age33_selected$weekly_pay <- with(df_age33_selected, case_when(
+  tmpJobPayPer == 1 ~ tmpJobPay,          # Weekly
+  tmpJobPayPer == 2 ~ tmpJobPay / 2,      # Fortnightly
+  tmpJobPayPer == 3 ~ tmpJobPay / 4,      # Four weeks
+  tmpJobPayPer == 4 ~ tmpJobPay / 4.33,   # Calendar month
+  tmpJobPayPer == 5 ~ tmpJobPay / 52,     # Year
+  TRUE ~ NA_real_
+))
+
+
+df_age33_selected$working_status <- case_when(
+  df_age33_selected$empStatus %in% c(1, 2, 3, 4)       ~ 1,
+  df_age33_selected$empStatus %in% c(5, 6, 7, 8, 9, 10) ~ 0,
+  TRUE                                ~ NA_real_  # catch any unexpected or missing values
+)
+
+# Summary stats
+summary(df_age33_selected$weekly_pay)
+sd(df_age33_selected$weekly_pay, na.rm = TRUE)
+rm(df_age33)
+```
+
+
+# Age 42
+
+```{r}
+df_age42 <- read_stata("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age42_Sweep6/stata/stata13_se/ncds6_v2.dta")
+var_labels <- sapply(df_age42, function(x) attr(x, "label"))
+label_df <- data.frame(variable = names(var_labels), label = unname(var_labels), stringsAsFactors = FALSE)
+```
+
+```{r}
+keep <- c(
+  "ncdsid" = "ncdsid",
+  "cgropay" = "tmpJobPay",       # PAY variable
+  "cgroprd" = "tmpJobPayPer",    # PAY PERIOD variable
+  "chours1" = "tmpJobHr",        # Usual hours/week
+  "soc" = "soc2000",             # SOC occupational code 
+  # "n7soc90" = "soc1990",             # SOC occupational code (derived from the 2000)
+  "econact" = "empStatus"      # Main economic activity
+)
+# Select and rename
+df_age42_selected <- df_age42 %>%
+  select(all_of(names(keep))) %>%
+  rename_with(~keep[.x], .cols = everything())
+
+df_age42_selected <- df_age42_selected %>%
+  mutate(across(-ncdsid, ~ifelse(. <= -1, NA, .)))
+
+# Normalize pay to weekly
+df_age42_selected$weekly_pay <- with(df_age42_selected, case_when(
+  tmpJobPayPer == 1 ~ tmpJobPay,          # Weekly
+  tmpJobPayPer == 2 ~ tmpJobPay / 2,      # Fortnightly
+  tmpJobPayPer == 3 ~ tmpJobPay / 4,      # Four weeks
+  tmpJobPayPer == 4 ~ tmpJobPay / 4.33,   # Calendar month
+  tmpJobPayPer == 5 ~ tmpJobPay / 52,     # Year
+  TRUE ~ NA_real_
+))
+
+df_age42_selected$working_status <- case_when(
+  df_age42_selected$empStatus %in% c(1, 2, 3, 4)          ~ 1,
+  df_age42_selected$empStatus  %in% c(5:12)       ~ 0,  # Not working: unemployed, education, sick, retired, etc.
+  df_age42_selected$empStatus  %in% -9:-1         ~ NA_real_,  # Typical missing codes
+  TRUE                       ~ NA_real_   # Catch unexpected values
+
+)
+```
+
+
+# Age 46
+```{r}
+df_age46 <- read_stata("/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/Age46_Sweep7/stata/stata13/ncds7.dta")
+var_labels <- sapply(df_age46, function(x) attr(x, "label"))
+label_df <- data.frame(variable = names(var_labels), label = unname(var_labels), stringsAsFactors = FALSE)
+
+```
+
+```{r}
+keep <- c(
+  "ncdsid" = "ncdsid",
+  "n7cgropy" = "tmpJobPay",       # PAY variable
+  "n7cgropd" = "tmpJobPayPer",    # PAY PERIOD variable
+  "n7chour1" = "tmpJobHr",        # Usual hours/week
+  "n7xso000" = "soc2000",             # SOC occupational code 
+  # "n7soc90" = "soc1990",             # SOC occupational code (derived from the 2000)
+  "nd7ecact" = "empStatus"      # Main economic activity
+)
+
+# Select and rename
+df_age46_selected <- df_age46 %>%
+  select(all_of(names(keep))) %>%
+  rename_with(~keep[.x], .cols = everything())
+
+df_age46_selected <- df_age46_selected %>%
+  mutate(across(-ncdsid, ~ifelse(. <= -1, NA, .)))
+
+df_age46_selected <- df_age46_selected %>%
+  mutate(across(-ncdsid, ~ifelse(. < -1, NA, .))) %>%
+  mutate(
+    tmpJobPayPer = ifelse(tmpJobPayPer == 97, NA, tmpJobPayPer),
+    empStatus = ifelse(empStatus %in% c(12, 97), NA, empStatus)
+  )
+
+df_age46_selected$working_status <- case_when(
+  df_age46_selected$empStatus %in% c(1, 2, 3, 4)          ~ 1,
+  df_age46_selected$empStatus %in% c(5, 6, 7, 8, 9, 10, 11, 12, 97) ~ 0,
+  df_age46_selected$empStatus %in% -9:-1                 ~ NA_real_,
+  TRUE                                   ~ NA_real_  # catch any unexpected values
+)
+
+# Normalize pay to weekly
+df_age46_selected$weekly_pay <- with(df_age46_selected, case_when(
+  tmpJobPayPer == 1 ~ tmpJobPay,          # Weekly
+  tmpJobPayPer == 2 ~ tmpJobPay / 2,      # Fortnightly
+  tmpJobPayPer == 3 ~ tmpJobPay / 4,      # Four weeks
+  tmpJobPayPer == 4 ~ tmpJobPay / 4.33,   # Calendar month
+  tmpJobPayPer == 5 ~ tmpJobPay / 52,     # Year
+  TRUE ~ NA_real_
+))
+summary(df_age46_selected)
+summary(df_age46_selected$weekly_pay)
+sd(df_age46_selected$weekly_pay, na.rm = TRUE)
+
+rm(df_age46)
+```
+
+
+```{r}
+# 2. Save all value labels
+val_labs <- val_labels(df_age23_selected)
+
+# 3. Zap all value labels (removes class "labelled" and strips labels)
+df_age23_selected <- df_age23_selected %>%  zap_labels() %>%  zap_label()   # also removes the variable label, optional
+## 1  Build the age-23 wave with both “age-23” education questions ----
+df_age23_clean <- df_age23_selected %>%                 # original age-23 file
+  select(ncdsid, weekly_pay, educ23v1, working_status) %>%              #   – educ23v1: asked at 23
+  left_join(                                            # add educ23: asked at 33
+    df_age33_selected %>% select(ncdsid, educ23),
+    by = "ncdsid"
+  ) %>%
+  mutate(
+    age = 23,
+    # logic for the consolidated age-23 education measure
+    educ23 = case_when(
+      is.na(educ23v1) & !is.na(educ23)            ~ educ23,     # rule 1
+      !is.na(educ23v1) &  is.na(educ23)           ~ educ23v1,   # rule 2
+      !is.na(educ23v1) & !is.na(educ23)           ~ educ23v1,   # rule 3
+      TRUE                                        ~ NA_real_    # rule 4
+    ),
+    # flag = 1 when both sources exist (no attempt to test equality)
+    educ23_flag = if_else(  !is.na(educ23v1) & !is.na(educ23) & educ23v1 != educ23,  1L, 0L),
+    educ33 = NA_real_
+  ) %>%
+  select(-educ23v1)                                  # keep just the combined version
+
+## 2  Age-33 wave (nothing changes here) -------------------------------
+df_age33_clean <- df_age33_selected %>%
+  select(ncdsid, weekly_pay, educ23, educ33, working_status) %>%
+  mutate(age = 33,
+         educ23_flag = NA_integer_)                  # flag not relevant for this row
+
+## 3  Age-46 wave ------------------------------------------------------
+df_age46_clean <- df_age46_selected %>%
+  select(ncdsid, weekly_pay, working_status) %>%
+  mutate(age    = 46,
+         educ23 = NA_real_,
+         educ33 = NA_real_,
+         educ23_flag = NA_integer_)
+
+## 4  Stack waves, choose the wave-specific education, then carry forward
+df_combined <- bind_rows(df_age23_clean,
+                         df_age33_clean,
+                         df_age46_clean) %>%
+  arrange(ncdsid, age) %>%
+  group_by(ncdsid) %>%
+  mutate(
+    educ_wave = case_when(
+      age == 23 ~ educ23,       # already consolidated above
+      age == 33 ~ educ33,
+      TRUE      ~ NA_real_
+    )
+  ) %>%
+  tidyr::fill(educ_wave, .direction = "down") %>%  # forward-fill to 33, 46
+  rename(educ = educ_wave) %>%
+  select(ncdsid, age, weekly_pay, educ, educ23_flag, working_status) %>%
+  ungroup()
+
+## quick check for one ID
+df_combined %>% filter(ncdsid == "N10734U")
+
+```
+
+```{r}
+summarise_by_group <- function(data, group_var, vars) {
+  data %>%
+    group_by({{group_var}}) %>%
+    summarise(across(
+      all_of(vars),
+      list(
+        count = ~sum(!is.na(.)),
+        mean = ~mean(., na.rm = TRUE),
+        sd = ~sd(., na.rm = TRUE),
+        min = ~min(., na.rm = TRUE),
+        q1 = ~quantile(., 0.25, na.rm = TRUE),
+        median = ~median(., na.rm = TRUE),
+        q3 = ~quantile(., 0.75, na.rm = TRUE),
+        max = ~max(., na.rm = TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    )) %>%
+    ungroup()
+}
+
+
+# Suppose you want to summarize weekly_pay and tmpJobHr by age:
+summarise_by_group(df_combined, age, vars = c("weekly_pay", "working_status"))
+
+```
+```{r}
+df_combined %>%
+  filter(working_status == 1) %>%
+  summarise_by_group(age, vars = c("weekly_pay"))
+
+
+df_combined %>%
+  filter(working_status == 0, age == 33) %>% summary()
+
+```
+
+```{r}
+# df_combined <- df_combined %>%
+#   mutate(weekly_pay = if_else(
+#     working_status == 0 & is.na(weekly_pay),
+#     0,
+#     weekly_pay
+#   ))
+df_combined <- df_combined %>% select(-educ23_flag)
+write.csv(df_combined, "/home/semipro321/OneDrive/School/McGill/Research Projects/Essay/Data/pretpourtrain.csv")
+
+```
+
+
+
+
+
+
+# Check the Summary Stats
+1. Check ppl who's wages show up at all ages Following Gregg 2017
+
+```{r}
+tmp <- df_combined %>%
+  filter(!is.na(weekly_pay) & weekly_pay > 0) %>%     # Keep valid wage rows
+  group_by(ncdsid) %>%
+  summarise(
+    count = n(),
+    has_all_ages = all(c(23, 33, 46) %in% age),
+    sum_wages = sum(weekly_pay, na.rm = TRUE)
+  ) %>%
+  filter(has_all_ages) %>%
+  arrange(ncdsid)
+
+
+  
+```
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
